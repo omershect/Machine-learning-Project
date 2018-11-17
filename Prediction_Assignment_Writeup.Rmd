@@ -1,0 +1,219 @@
+---
+title: "Prediction Assignment Writeup"
+author: "O.S."
+date: "16 November 2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary 
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible
+to collect a large amount of data about personal activity relatively inexpensively.
+The purpose of this exercise is to use the data to try and 
+predict five type of activities (the way they did the training)
+
+
+Libraries 
+```{r  }
+library(ggplot2)
+library(caret)
+library(gbm)
+library(parallel)
+library(doParallel)
+library(dplyr)
+```
+
+## Load Data
+
+```{r load data, echo=FALSE}
+training = read.csv("E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-training.csv")
+
+validiation = read.csv("E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-testing.csv")
+
+```
+
+### Data observiation 
+```{r}
+dim(training)
+```
+The training data set contains 19622 observations and 160 variables.
+
+```{r}
+dim(validiation)
+```
+The validation set is 20 observations over 160 variables. 
+
+## Data cleaning
+Calculate the NA percentage.
+
+```{r}
+NAnoTrain<-sum(is.na(training))
+NAtrainPercentage<-NAnoTrain/(ncol(training)*nrow(training)) 
+NAnoValidiation<-sum(is.na(validiation))
+NAValidiationPercentage<-NAnoValidiation/(ncol(validiation)*nrow(validiation)) 
+print(NAtrainPercentage)
+print(NAValidiationPercentage)
+
+
+
+```
+It can be sen there is a large number of NA values. 
+In the Training set 0.41 of the data is NA.
+in the Validation set 0.625 of the information is NA.
+
+The approach is to check if a column contains more the 80% NA
+either in training or in the validation set 
+and remove it from both sets (if true).
+```{r}
+
+#Calculate the percentage of the NA in each column 
+#and remove the columns which 
+#have more than 80% NA - Training
+TrainColNAPrec<-training %>% 
+   summarise_all(funs(100*mean(is.na(.))))
+TrainColToRemove<-names(TrainColNAPrec[,TrainColNAPrec>99])
+
+
+#Calculate the percentage of the NA in each column 
+#and remove the columns which 
+#have more than 80% NA - Validiation
+ValidiationColNAPrec<-validiation %>% 
+   summarise_all(funs(100*mean(is.na(.))))
+ValidiationToRemove<-names(ValidiationColNAPrec[,ValidiationColNAPrec>99])
+
+#Bind the column's names (If the NA percentage is above 80% in 
+#one of the set remove the columns from both sets
+ColToRemove<-unique(c(TrainColToRemove,ValidiationToRemove))
+ColToKeep<-!(names(training) %in% ColToRemove)
+Training<-training[ ,ColToKeep]
+Validiation<-validiation[ ,ColToKeep]
+   
+```
+
+Remove the names data and the timestamps related columns
+As they will not contribute to the prediction.
+
+```{r}
+trainRemove <- grepl("^X|timestamp|window", names(Training))
+Training <- Training[, !trainRemove]
+
+ValidiationRemove <- grepl("^X|timestamp|window", names(Validiation))
+Validiation <- Validiation[, !ValidiationRemove]
+print(dim(Training))
+print(dim(Validiation))
+
+```
+There are 54 columns left for the Training and Validiation 
+ 
+
+## Modeling 
+The model that will be tested are :
+
+
+GBM -  (Gradient Boosting Machine) (Boosting with Trees)
+RF - Random Forests
+
+
+
+Split the Training set into train and test sets 
+```{r}
+set.seed(123444) # For reproducibile purpose
+inTrain <- createDataPartition(Training$classe, p=0.70, list=F)
+trainData <- Training[inTrain, ]
+testData <- Training[-inTrain, ]
+```
+
+
+##GBM Model
+```{r}
+
+#Use parallel processing to train the model.
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE)
+```
+
+Train the model 
+```{r}
+set.seed(13444)
+gbmfit <- train(as.factor(classe)~., method="gbm",data=trainData,trControl = fitControl)
+```
+
+Stop Parllel processing
+```{r}
+stopCluster(cluster)
+registerDoSEQ()
+```
+Predict using the test data  in order to calculate the accuercy.
+```{r}
+gbmpred <- predict(gbmfit,testData)
+gbmaccuracy <- confusionMatrix(gbmpred,testData$classe)$overall['Accuracy']
+
+```
+
+
+
+##RF Model
+```{r}
+
+#Use parallel processing to train the model.
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE)
+```
+
+Train the model 
+```{r}
+set.seed(13444)
+RFfit <- train(as.factor(classe)~., method="rf",data=trainData,trControl = fitControl)
+```
+
+Stop Parllel processing
+
+```{r}
+stopCluster(cluster)
+registerDoSEQ()
+```
+Predict using the test data  in order to calculate the accuercy.
+```{r}
+RFpred <- predict(RFfit,testData)
+RFaccuracy <- confusionMatrix(RFpred,testData$classe)$overall['Accuracy']
+
+```
+
+#stacking (Using the two models)
+```{r}
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",
+                           number = 5,
+                           allowParallel = TRUE)
+pred1 <- predict(gbmfit,testData); pred2 <- predict(RFfit,testData)
+predDF <- data.frame(pred1,pred2,classe=testData$classe)
+combModFit <- train(classe ~.,method="rf",data=predDF)
+stopCluster(cluster)
+registerDoSEQ()
+combPred <- predict(combModFit,predDF)
+StackAccuercy<-confusionMatrix(combPred,testData$classe)$overall['Accuracy']
+```
+
+
+
+
+Results
+```{r}
+cat("GBM Accuercy:",gbmaccuracy)
+cat("RF Accuercy:",RFaccuracy)
+cat("Stack Accuercy:",StackAccuercy)
+
+```
+
