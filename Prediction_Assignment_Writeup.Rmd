@@ -3,8 +3,8 @@ title: "Prediction Assignment Writeup"
 author: "O.S."
 date: "16 November 2018"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -19,13 +19,16 @@ predict five type of activities (the way they did the training)
 
 
 Libraries 
-```{r  }
+```{r echo=FALSE, message = FALSE }
 library(ggplot2)
 library(caret)
 library(gbm)
 library(parallel)
 library(doParallel)
 library(dplyr)
+library(rpart)
+library(rpart.plot)
+
 ```
 
 ## Load Data
@@ -76,7 +79,7 @@ and remove it from both sets (if true).
 #have more than 80% NA - Training
 TrainColNAPrec<-training %>% 
    summarise_all(funs(100*mean(is.na(.))))
-TrainColToRemove<-names(TrainColNAPrec[,TrainColNAPrec>99])
+TrainColToRemove<-names(TrainColNAPrec[,TrainColNAPrec>80])
 
 
 #Calculate the percentage of the NA in each column 
@@ -84,7 +87,7 @@ TrainColToRemove<-names(TrainColNAPrec[,TrainColNAPrec>99])
 #have more than 80% NA - Validiation
 ValidiationColNAPrec<-validiation %>% 
    summarise_all(funs(100*mean(is.na(.))))
-ValidiationToRemove<-names(ValidiationColNAPrec[,ValidiationColNAPrec>99])
+ValidiationToRemove<-names(ValidiationColNAPrec[,ValidiationColNAPrec>80])
 
 #Bind the column's names (If the NA percentage is above 80% in 
 #one of the set remove the columns from both sets
@@ -141,9 +144,9 @@ fitControl <- trainControl(method = "cv",
 ```
 
 Train the model 
-```{r}
+```{r }
 set.seed(13444)
-gbmfit <- train(as.factor(classe)~., method="gbm",data=trainData,trControl = fitControl)
+gbmfit <- train(as.factor(classe)~., method="gbm",data=trainData,trControl = fitControl,verbose = FALSE)
 ```
 
 Stop Parllel processing
@@ -190,30 +193,37 @@ RFaccuracy <- confusionMatrix(RFpred,testData$classe)$overall['Accuracy']
 
 ```
 
-#stacking (Using the two models)
-```{r}
-cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
-registerDoParallel(cluster)
-fitControl <- trainControl(method = "cv",
-                           number = 5,
-                           allowParallel = TRUE)
-pred1 <- predict(gbmfit,testData); pred2 <- predict(RFfit,testData)
-predDF <- data.frame(pred1,pred2,classe=testData$classe)
-combModFit <- train(classe ~.,method="rf",data=predDF)
-stopCluster(cluster)
-registerDoSEQ()
-combPred <- predict(combModFit,predDF)
-StackAccuercy<-confusionMatrix(combPred,testData$classe)$overall['Accuracy']
-```
-
-
-
 
 Results
 ```{r}
 cat("GBM Accuercy:",gbmaccuracy)
 cat("RF Accuercy:",RFaccuracy)
-cat("Stack Accuercy:",StackAccuercy)
 
+
+```
+
+The Random Forest model provides the best accuracy on the test set 
+Here is the model parameters.
+```{r}
+RFfit
+```
+
+Predict (Validation) using the Random Forest model
+```{r}
+predict(RFfit,newdata = Validiation)
+```
+
+
+## Appendix
+Table of the 20 most important variables in the random forest model.
+
+```{r}
+varImp(RFfit)
+```
+
+Visualizing the decision tree. 
+```{r}
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeModel) # fast plot
 ```
 
