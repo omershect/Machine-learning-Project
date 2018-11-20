@@ -133,14 +133,38 @@ $(document).ready(function () {
 <h2>Executive Summary</h2>
 <p>Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. The purpose of this exercise is to use the data to try and predict five type of activities (the way they did the training)</p>
 <p>Libraries</p>
+<pre class="r"><code>library(ggplot2)
+library(caret)</code></pre>
+<pre><code>## Loading required package: lattice</code></pre>
+<pre class="r"><code>library(gbm)</code></pre>
+<pre><code>## Loaded gbm 2.1.4</code></pre>
+<pre class="r"><code>library(parallel)
+library(doParallel)</code></pre>
+<pre><code>## Loading required package: foreach</code></pre>
+<pre><code>## Loading required package: iterators</code></pre>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: 'dplyr'</code></pre>
+<pre><code>## The following objects are masked from 'package:stats':
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(rpart)
+library(rpart.plot)</code></pre>
 </div>
 <div id="load-data" class="section level2">
 <h2>Load Data</h2>
-<div id="data-observiation" class="section level3">
-<h3>Data observiation</h3>
+<p>Loading the data.</p>
+<pre class="r"><code>training = read.csv(&quot;E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-training.csv&quot;)
+
+validiation = read.csv(&quot;E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-testing.csv&quot;)</code></pre>
+<div id="data-observation" class="section level3">
+<h3>Data observation</h3>
 <pre class="r"><code>dim(training)</code></pre>
 <pre><code>## [1] 19622   160</code></pre>
-<p>The training data set contains 19622 observations and 160 variables.</p>
+<p>The training dataset contains 19622 observations and 160 variables.</p>
 <pre class="r"><code>dim(validiation)</code></pre>
 <pre><code>## [1]  20 160</code></pre>
 <p>The validation set is 20 observations over 160 variables.</p>
@@ -157,7 +181,7 @@ print(NAtrainPercentage)</code></pre>
 <pre><code>## [1] 0.4100856</code></pre>
 <pre class="r"><code>print(NAValidiationPercentage)</code></pre>
 <pre><code>## [1] 0.625</code></pre>
-<p>It can be sen there is a large number of NA values. In the Training set 0.41 of the data is NA. in the Validation set 0.625 of the information is NA.</p>
+<p>t can be sen there is a large number of NA values. In the Training set,0.41 of the data is NA. In the Validation set, 0.625 of the information is NA.</p>
 <p>The approach is to check if a column contains more the 80% NA either in training or in the validation set and remove it from both sets (if true).</p>
 <pre class="r"><code>#Calculate the percentage of the NA in each column 
 #and remove the columns which 
@@ -169,7 +193,7 @@ TrainColToRemove&lt;-names(TrainColNAPrec[,TrainColNAPrec&gt;80])
 
 #Calculate the percentage of the NA in each column 
 #and remove the columns which 
-#have more than 80% NA - Validiation
+#have more than 80% NA - Validation
 ValidiationColNAPrec&lt;-validiation %&gt;% 
    summarise_all(funs(100*mean(is.na(.))))
 ValidiationToRemove&lt;-names(ValidiationColNAPrec[,ValidiationColNAPrec&gt;80])
@@ -190,13 +214,13 @@ print(dim(Training))</code></pre>
 <pre><code>## [1] 19622    54</code></pre>
 <pre class="r"><code>print(dim(Validiation))</code></pre>
 <pre><code>## [1] 20 54</code></pre>
-<p>There are 54 columns left for the Training and Validiation</p>
+<p>There are 54 columns left for the Training and Validation.</p>
 </div>
 <div id="modeling" class="section level2">
 <h2>Modeling</h2>
 <p>The model that will be tested are :</p>
-<p>GBM - (Gradient Boosting Machine) (Boosting with Trees) RF - Random Forests</p>
-<p>Split the Training set into train and test sets</p>
+<p>GBM - (Gradient Boosting Machine) (Boosting with Trees). RF - Random Forests.</p>
+<p>Split the Training set into train and test sets.</p>
 <pre class="r"><code>set.seed(123444) # For reproducibile purpose
 inTrain &lt;- createDataPartition(Training$classe, p=0.70, list=F)
 trainData &lt;- Training[inTrain, ]
@@ -210,13 +234,13 @@ registerDoParallel(cluster)
 fitControl &lt;- trainControl(method = &quot;cv&quot;,
                            number = 5,
                            allowParallel = TRUE)</code></pre>
-<p>Train the model</p>
+<p>Train the model.</p>
 <pre class="r"><code>set.seed(13444)
 gbmfit &lt;- train(as.factor(classe)~., method=&quot;gbm&quot;,data=trainData,trControl = fitControl,verbose = FALSE)</code></pre>
-<p>Stop Parllel processing</p>
+<p>Stop parallel processing.</p>
 <pre class="r"><code>stopCluster(cluster)
 registerDoSEQ()</code></pre>
-<p>Predict using the test data in order to calculate the accuercy.</p>
+<p>Predict using the test data to calculate the accuracy.</p>
 <pre class="r"><code>gbmpred &lt;- predict(gbmfit,testData)
 gbmaccuracy &lt;- confusionMatrix(gbmpred,testData$classe)$overall['Accuracy']</code></pre>
 </div>
@@ -228,21 +252,21 @@ registerDoParallel(cluster)
 fitControl &lt;- trainControl(method = &quot;cv&quot;,
                            number = 5,
                            allowParallel = TRUE)</code></pre>
-<p>Train the model</p>
+<p>Train the model.</p>
 <pre class="r"><code>set.seed(13444)
 RFfit &lt;- train(as.factor(classe)~., method=&quot;rf&quot;,data=trainData,trControl = fitControl)</code></pre>
-<p>Stop Parllel processing</p>
+<p>Stop parallel processing.</p>
 <pre class="r"><code>stopCluster(cluster)
 registerDoSEQ()</code></pre>
-<p>Predict using the test data in order to calculate the accuercy.</p>
+<p>Predict using the test data to calculate the accuracy.</p>
 <pre class="r"><code>RFpred &lt;- predict(RFfit,testData)
 RFaccuracy &lt;- confusionMatrix(RFpred,testData$classe)$overall['Accuracy']</code></pre>
-<p>Results</p>
+<p>Results:</p>
 <pre class="r"><code>cat(&quot;GBM Accuercy:&quot;,gbmaccuracy)</code></pre>
 <pre><code>## GBM Accuercy: 0.9617672</code></pre>
 <pre class="r"><code>cat(&quot;RF Accuercy:&quot;,RFaccuracy)</code></pre>
 <pre><code>## RF Accuercy: 0.9935429</code></pre>
-<p>The Random Forest model provides the best accuracy on the test set Here is the model parameters.</p>
+<p>The Random Forest model provides the best accuracy on the test set Here are the model parameters.</p>
 <pre class="r"><code>RFfit</code></pre>
 <pre><code>## Random Forest 
 ## 
@@ -262,7 +286,7 @@ RFaccuracy &lt;- confusionMatrix(RFpred,testData$classe)$overall['Accuracy']</co
 ## 
 ## Accuracy was used to select the optimal model using the largest value.
 ## The final value used for the model was mtry = 29.</code></pre>
-<p>Predict (Validation) using the Random Forest model</p>
+<p>Predict (Validation) using the Random Forest model.</p>
 <pre class="r"><code>predict(RFfit,newdata = Validiation)</code></pre>
 <pre><code>##  [1] B A B A A E D B A A B C B A E E A B B B
 ## Levels: A B C D E</code></pre>

@@ -19,7 +19,7 @@ predict five type of activities (the way they did the training)
 
 
 Libraries 
-```{r echo=FALSE, message = FALSE }
+```{r }
 library(ggplot2)
 library(caret)
 library(gbm)
@@ -32,19 +32,20 @@ library(rpart.plot)
 ```
 
 ## Load Data
+Loading the data.
 
-```{r load data, echo=FALSE}
+```{r load data, }
 training = read.csv("E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-training.csv")
 
 validiation = read.csv("E:/Elements/Coursera/Data Sciense/Course 8 - Practical Machine Learning/Project/pml-testing.csv")
 
 ```
 
-### Data observiation 
+### Data observation
 ```{r}
 dim(training)
 ```
-The training data set contains 19622 observations and 160 variables.
+The training dataset contains 19622 observations and 160 variables.
 
 ```{r}
 dim(validiation)
@@ -65,13 +66,14 @@ print(NAValidiationPercentage)
 
 
 ```
-It can be sen there is a large number of NA values. 
-In the Training set 0.41 of the data is NA.
-in the Validation set 0.625 of the information is NA.
+t can be sen there is a large number of NA values. 
+In the Training set,0.41 of the data is NA.
+In the Validation set, 0.625 of the information is NA.
 
 The approach is to check if a column contains more the 80% NA
 either in training or in the validation set 
 and remove it from both sets (if true).
+
 ```{r}
 
 #Calculate the percentage of the NA in each column 
@@ -84,7 +86,7 @@ TrainColToRemove<-names(TrainColNAPrec[,TrainColNAPrec>80])
 
 #Calculate the percentage of the NA in each column 
 #and remove the columns which 
-#have more than 80% NA - Validiation
+#have more than 80% NA - Validation
 ValidiationColNAPrec<-validiation %>% 
    summarise_all(funs(100*mean(is.na(.))))
 ValidiationToRemove<-names(ValidiationColNAPrec[,ValidiationColNAPrec>80])
@@ -111,19 +113,16 @@ print(dim(Training))
 print(dim(Validiation))
 
 ```
-There are 54 columns left for the Training and Validiation 
+There are 54 columns left for the Training and Validation. 
  
 
 ## Modeling 
 The model that will be tested are :
 
+GBM -  (Gradient Boosting Machine) (Boosting with Trees).
+RF - Random Forests.
 
-GBM -  (Gradient Boosting Machine) (Boosting with Trees)
-RF - Random Forests
-
-
-
-Split the Training set into train and test sets 
+Split the Training set into train and test sets. 
 ```{r}
 set.seed(123444) # For reproducibile purpose
 inTrain <- createDataPartition(Training$classe, p=0.70, list=F)
@@ -143,25 +142,23 @@ fitControl <- trainControl(method = "cv",
                            allowParallel = TRUE)
 ```
 
-Train the model 
+Train the model. 
 ```{r }
 set.seed(13444)
 gbmfit <- train(as.factor(classe)~., method="gbm",data=trainData,trControl = fitControl,verbose = FALSE)
 ```
 
-Stop Parllel processing
+Stop parallel processing.
 ```{r}
 stopCluster(cluster)
 registerDoSEQ()
 ```
-Predict using the test data  in order to calculate the accuercy.
+Predict using the test data to calculate the accuracy.
 ```{r}
 gbmpred <- predict(gbmfit,testData)
 gbmaccuracy <- confusionMatrix(gbmpred,testData$classe)$overall['Accuracy']
 
 ```
-
-
 
 ##RF Model
 ```{r}
@@ -174,41 +171,36 @@ fitControl <- trainControl(method = "cv",
                            allowParallel = TRUE)
 ```
 
-Train the model 
+Train the model.
 ```{r}
 set.seed(13444)
 RFfit <- train(as.factor(classe)~., method="rf",data=trainData,trControl = fitControl)
 ```
-
-Stop Parllel processing
-
+Stop parallel processing.
 ```{r}
 stopCluster(cluster)
 registerDoSEQ()
 ```
-Predict using the test data  in order to calculate the accuercy.
+Predict using the test data to calculate the accuracy.
 ```{r}
 RFpred <- predict(RFfit,testData)
 RFaccuracy <- confusionMatrix(RFpred,testData$classe)$overall['Accuracy']
 
 ```
-
-
-Results
+Results:
 ```{r}
 cat("GBM Accuercy:",gbmaccuracy)
 cat("RF Accuercy:",RFaccuracy)
 
 
 ```
-
 The Random Forest model provides the best accuracy on the test set 
-Here is the model parameters.
+Here are the model parameters.
 ```{r}
 RFfit
 ```
 
-Predict (Validation) using the Random Forest model
+Predict (Validation) using the Random Forest model.
 ```{r}
 predict(RFfit,newdata = Validiation)
 ```
